@@ -1,16 +1,17 @@
 import pandas as pd
-import numpy as np
+import sns
+from matplotlib import pyplot as plt
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, classification_report
 from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, classification_report
-import xgboost as xgb  # Importing XGBoost library
+import lightgbm as lgb
 import joblib  # For saving the scaler
-import seaborn as sns
-import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier  # Import MLPClassifier
+
+from sklearn.neural_network import MLPClassifier  # Import MLPClassifier
 
 # Load dataset
 df = pd.read_csv('data/train.csv')
@@ -69,18 +70,19 @@ param_dist_lr = {
     'solver': ['liblinear', 'saga']
 }
 
-param_dist_knn = {
-    'n_neighbors': [3, 5, 10],
-    'weights': ['uniform', 'distance'],
-    'metric': ['minkowski', 'euclidean']
+param_dist_nn = {
+    'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 100)],  # Number of neurons in hidden layers
+    'activation': ['relu', 'tanh'],  # Activation function for the hidden layers
+    'solver': ['adam', 'sgd'],  # Optimization algorithm
+    'learning_rate': ['constant', 'invscaling', 'adaptive'],  # Learning rate
+    'max_iter': [200, 500, 1000]  # Number of iterations
 }
 
-param_dist_xgb = {
-    'max_depth': [3, 6, 10],
+param_dist_lgbm = {
+    'num_leaves': [31, 50, 100],
+    'max_depth': [10, 20, 30],
     'learning_rate': [0.01, 0.05, 0.1],
-    'n_estimators': [100, 200, 300],
-    'subsample': [0.8, 0.9, 1.0],
-    'colsample_bytree': [0.8, 0.9, 1.0]
+    'n_estimators': [100, 200, 300]
 }
 
 # Initialize the models
@@ -88,8 +90,8 @@ models = {
     'Random Forest': RandomForestClassifier(),
     'Support Vector Machine': SVC(),
     'Logistic Regression': LogisticRegression(),
-    'K-Nearest Neighbors': KNeighborsClassifier(),
-    'XGBoost': xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')  # Using XGBoost model
+    'Neural Network': MLPClassifier(),  # Replaced KNN with Neural Network
+    'LightGBM': lgb.LGBMClassifier()
 }
 
 # Hyperparameter tuning for each model
@@ -97,8 +99,8 @@ param_dists = {
     'Random Forest': param_dist_rf,
     'Support Vector Machine': param_dist_svm,
     'Logistic Regression': param_dist_lr,
-    'K-Nearest Neighbors': param_dist_knn,
-    'XGBoost': param_dist_xgb  # XGBoost parameters
+    'Neural Network': param_dist_nn,  # Neural Network hyperparameters
+    'LightGBM': param_dist_lgbm
 }
 
 # Use Stratified KFold for cross-validation
@@ -127,7 +129,7 @@ for model_name in models:
 
     print(f"Best parameters for {model_name}: {random_search.best_params_}")
 
-# Evaluate the models on the test set and collect accuracy scores
+# Evaluate the models on the test set
 test_scores = {}
 
 for model_name, model in best_models.items():
@@ -146,11 +148,6 @@ for model_name, model in best_models.items():
     print(report)
 
 
-
-# Summary of test accuracies for all models
-print("\nSummary of Test Accuracy Scores:")
-for model_name, accuracy in test_scores.items():
-    print(f"{model_name}: {accuracy * 100:.2f}%")
 
 # Save the best model (based on highest test accuracy)
 best_model_name = max(test_scores, key=test_scores.get)
